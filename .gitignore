@@ -20,8 +20,6 @@ embeddings.json
 # --- macOS ---
 .DS_Store
 
-# --- Leftover from an earlier version of this project ---
-# This repo began as a RAG over the "Attention Is All You Need" paper before
-# being retargeted at the Canada Business Corporations Act. The paper PDF is
-# not used by any code path and can be deleted.
-NIPS-2017-attention-is-all-you-need-Paper.pdf
+# Note: tests/fixtures/attention-is-all-you-need.pdf is intentionally tracked.
+# It is a leftover from when this repo was a RAG over that paper, and is now
+# used as a real single-column negative fixture for layout detection.
