@@ -1,0 +1,13 @@
+# Runtime dependencies for LegalMind.
+#
+# Versions are pinned exactly to what this project was developed and tested
+# against, so a clone reproduces the same behaviour. Retrieval quality depends
+# on the embedding model and the PDF text extractor, both of which can change
+# across minor releases -- an unpinned install could silently change results.
+#
+# Python 3.13 (developed on 3.13.9).
+
+openai==2.44.0      # embeddings (text-embedding-3-small) + chat completions
+pymupdf==1.27.2.3   # PDF text extraction, including per-line coordinates
+numpy==2.5.0        # vector math for cosine similarity
+nltk==3.9.4         # sentence tokenization for chunking

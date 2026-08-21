@@ -1,0 +1,10 @@
+# Development dependencies. Install with:
+#   pip install -r requirements-dev.txt
+#
+# Kept separate from requirements.txt so that running the system does not pull
+# in a test framework. Not pinned exactly (unlike runtime deps) because the
+# test runner does not affect retrieval behaviour.
+
+-r requirements.txt
+
+pytest>=8.0

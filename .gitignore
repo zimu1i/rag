@@ -1,0 +1,27 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+.pytest_cache/
+
+# --- Secrets ---
+# The OpenAI key is read from the OPENAI_API_KEY environment variable.
+# Nothing in this repo should ever contain a key; this is a backstop.
+.env
+
+# --- Generated artifacts ---
+# Embedding cache: ~2,500 chunks x 1,536 dims stored as JSON is roughly 75 MB.
+# Regenerated from the source PDF by running the pipeline, so it is not source.
+embeddings.json
+*.npy
+*.npz
+
+# --- macOS ---
+.DS_Store
+
+# --- Leftover from an earlier version of this project ---
+# This repo began as a RAG over the "Attention Is All You Need" paper before
+# being retargeted at the Canada Business Corporations Act. The paper PDF is
+# not used by any code path and can be deleted.
+NIPS-2017-attention-is-all-you-need-Paper.pdf
