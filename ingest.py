@@ -83,6 +83,11 @@ class Line:
     y0: float
     x1: float
     text: str
+    # PyMuPDF's block index within the page. Blocks correspond closely to
+    # paragraphs, which is what lets downstream cleanup rejoin wrapped lines
+    # into prose without guessing from vertical gaps alone. Defaulted so that
+    # Line can still be constructed positionally in tests.
+    block: int = 0
 
 
 @dataclass(frozen=True)
@@ -110,6 +115,7 @@ class BilingualDocument:
     left: list[Line]
     right: list[Line]
     layout: ColumnLayout
+    page_height: float
 
     def text(self, side: str) -> str:
         """Join one column's lines into a single string in reading order."""
@@ -192,7 +198,7 @@ def extract_lines(document: pymupdf.Document) -> list[Line]:
     """
     lines: list[Line] = []
     for page in document:
-        for block in page.get_text("dict")["blocks"]:
+        for block_index, block in enumerate(page.get_text("dict")["blocks"]):
             # Image blocks have no "lines" key.
             for line in block.get("lines", []):
                 text = "".join(span["text"] for span in line["spans"]).strip()
@@ -200,7 +206,14 @@ def extract_lines(document: pymupdf.Document) -> list[Line]:
                     continue
                 x0, y0, x1, _ = line["bbox"]
                 lines.append(
-                    Line(page=page.number, x0=x0, y0=y0, x1=x1, text=text)
+                    Line(
+                        page=page.number,
+                        x0=x0,
+                        y0=y0,
+                        x1=x1,
+                        text=text,
+                        block=block_index,
+                    )
                 )
     return lines
 
@@ -216,6 +229,7 @@ def extract_bilingual(path: str) -> BilingualDocument:
     with pymupdf.open(path) as document:
         lines = extract_lines(document)
         page_width = document[0].rect.width
+        page_height = document[0].rect.height
 
     layout = detect_layout(lines, page_width)
 
@@ -229,4 +243,6 @@ def extract_bilingual(path: str) -> BilingualDocument:
         (ln for ln in lines if assign_column(ln.x0, layout) == "right"),
         key=lambda ln: (ln.page, ln.y0, ln.x0),
     )
-    return BilingualDocument(left=left, right=right, layout=layout)
+    return BilingualDocument(
+        left=left, right=right, layout=layout, page_height=page_height
+    )
