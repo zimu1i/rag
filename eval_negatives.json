@@ -1,0 +1,76 @@
+{
+  "_comment": [
+    "Out-of-scope questions for calibrating the groundedness check.",
+    "DRAFTED BY CLAUDE, REVIEWED BY MUZI LI.",
+    "",
+    "These are questions the Canada Business Corporations Act cannot answer. A",
+    "correct system declines them. They are kept in a separate file from",
+    "eval_set.json because they measure a different thing: eval_set.json measures",
+    "whether the right provision is retrieved, and counting an unanswerable",
+    "question as a retrieval 'miss' would corrupt those numbers.",
+    "",
+    "Difficulty matters more than quantity here. 'What is the capital of France?'",
+    "is trivial to decline -- nothing in a corporate statute is remotely close to",
+    "it. The cases that decide whether a threshold is any good are the",
+    "near-misses: questions about corporate law that this particular statute does",
+    "not govern. Those retrieve plausible-looking chunks with real similarity, and",
+    "a threshold tuned only on easy negatives will wave them through."
+  ],
+  "cases": [
+    {
+      "question": "how do I incorporate a company in Delaware?",
+      "difficulty": "near_miss",
+      "why": "Corporate incorporation, but US state law. The CBCA governs federal Canadian incorporation and will retrieve its own incorporation provisions."
+    },
+    {
+      "question": "what are the requirements to incorporate under the Ontario Business Corporations Act?",
+      "difficulty": "near_miss",
+      "why": "Provincial statute. Nearly identical vocabulary to the CBCA, so retrieval will return confident-looking federal provisions."
+    },
+    {
+      "question": "what do the CBCA regulations require of a distributing corporation?",
+      "difficulty": "near_miss",
+      "why": "The Act defers this definition to the Regulations, which are a separate instrument and are not indexed. The Act itself only points at them."
+    },
+    {
+      "question": "what are the continuous disclosure obligations under Canadian securities law?",
+      "difficulty": "near_miss",
+      "why": "Securities regulation is provincial and separate from the CBCA, though the Act mentions distributing corporations and shareholder disclosure."
+    },
+    {
+      "question": "what happens to shareholders when a corporation goes bankrupt?",
+      "difficulty": "near_miss",
+      "why": "Governed by the Bankruptcy and Insolvency Act. The CBCA covers liquidation and dissolution, which is adjacent but different, and will retrieve those."
+    },
+    {
+      "question": "can a corporation dismiss an employee without notice?",
+      "difficulty": "near_miss",
+      "why": "Employment law. The Act is full of 'corporation' and mentions officers and employees, so retrieval will find surface matches."
+    },
+    {
+      "question": "how are dividends taxed in the hands of a shareholder?",
+      "difficulty": "adjacent",
+      "why": "Tax law. The CBCA governs whether a dividend may be declared, never its tax treatment."
+    },
+    {
+      "question": "how do I file a patent application in Canada?",
+      "difficulty": "unrelated",
+      "why": "Different area of law entirely, though still Canadian and statutory."
+    },
+    {
+      "question": "should I incorporate my business or stay a sole proprietor?",
+      "difficulty": "advice",
+      "why": "Asks for advice rather than the content of the law. A legal information tool should decline regardless of what it retrieves."
+    },
+    {
+      "question": "what is the capital of France?",
+      "difficulty": "unrelated",
+      "why": "Control case. If this is not declined, nothing is."
+    },
+    {
+      "question": "who is the current Minister of Innovation, Science and Industry?",
+      "difficulty": "unrelated",
+      "why": "The Act refers to the Minister throughout but never names one. Tests whether surface term overlap alone can trigger an answer."
+    }
+  ]
+}

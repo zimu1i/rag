@@ -152,6 +152,19 @@ def load_eval_set(path: str = DEFAULT_EVAL_SET) -> list[EvalCase]:
     ]
 
 
+DEFAULT_NEGATIVES = "eval_negatives.json"
+
+
+def load_negatives(path: str = DEFAULT_NEGATIVES) -> list[dict]:
+    """Load out-of-scope questions used to calibrate the groundedness check.
+
+    Kept separate from the retrieval eval set: these have no correct provision,
+    so scoring them as retrieval misses would corrupt recall and MRR.
+    """
+    with open(path) as handle:
+        return json.load(handle)["cases"]
+
+
 def evaluate_case(case: EvalCase, retrieved) -> CaseResult:
     """Locate each expected provision in a ranked result list."""
     ranks: list[int | None] = []
@@ -329,12 +342,152 @@ def hybrid_retriever(chunks, matrix, path: str = QUERY_CACHE_FILE, use_structure
     )
 
 
+def report_support(chunks, embeddings, matrix):
+    """Print the support-score distribution for answerable vs out-of-scope questions.
+
+    This is the measurement that decides whether a threshold can separate them
+    at all. If the two distributions overlap, no single cutoff will work and the
+    check needs a different signal.
+    """
+    import groundedness
+
+    cache = load_query_cache()
+    retriever = hybrid_retriever(chunks, matrix)
+    position = {chunk: index for index, chunk in enumerate(chunks)}
+
+    def score(question):
+        retrieved = retriever(question, rag.DEFAULT_TOP_K)
+        vectors = [embeddings[position[chunk]] for chunk in retrieved]
+        return groundedness.support_score(cache[question], vectors), retrieved
+
+    missing = [
+        question
+        for question in [c.question for c in load_eval_set()]
+        + [n["question"] for n in load_negatives()]
+        if question not in cache
+    ]
+    if missing:
+        raise SystemExit(
+            f"{len(missing)} question(s) not in the query cache. "
+            f"Run `./venv/bin/python evaluation.py warm` first."
+        )
+
+    print("ANSWERABLE (should be answered)")
+    answerable = []
+    for case in load_eval_set():
+        value, retrieved = score(case.question)
+        answerable.append(value)
+        print(f"  {value:.3f}  [{case.category:<15}] {case.question[:58]}")
+
+    print("\nOUT OF SCOPE (should be declined)")
+    negatives = []
+    for negative in sorted(load_negatives(), key=lambda n: n["difficulty"]):
+        value, retrieved = score(negative["question"])
+        negatives.append(value)
+        top = retrieved[0].citation if retrieved else "-"
+        print(
+            f"  {value:.3f}  [{negative['difficulty']:<10}] "
+            f"{negative['question'][:48]:<48} top={top}"
+        )
+
+    print(
+        f"\nanswerable : min {min(answerable):.3f}  "
+        f"median {sorted(answerable)[len(answerable) // 2]:.3f}  max {max(answerable):.3f}"
+    )
+    print(
+        f"out-of-scope: min {min(negatives):.3f}  "
+        f"median {sorted(negatives)[len(negatives) // 2]:.3f}  max {max(negatives):.3f}"
+    )
+    gap = min(answerable) - max(negatives)
+    print(
+        f"\nseparation : {gap:+.3f} "
+        f"({'clean, a threshold exists' if gap > 0 else 'OVERLAP - no single cutoff separates them'})"
+    )
+
+
+def report_refusals(chunks, matrix):
+    """Measure how often the model declines a question the Act cannot answer.
+
+    Whether an answer counts as a refusal is decided by whether it cites any
+    provision. The system prompt requires a citation for every statement, so an
+    answer with no citation is not asserting anything about the Act. That is a
+    proxy rather than a definition -- it is printed alongside each answer so the
+    classification can be checked by eye rather than trusted.
+    """
+    import groundedness
+    import rag
+    from openai import OpenAI
+
+    client = OpenAI()
+    retriever = hybrid_retriever(chunks, matrix)
+
+    def ask(question):
+        retrieved = retriever(question, rag.DEFAULT_TOP_K)
+        result = rag.answer_question(client, question, lambda q, k: retrieved, verbose=False)
+        return result.text, groundedness.cited_provisions(result.text), result.audit
+
+    print("OUT OF SCOPE (a refusal is the correct outcome)\n")
+    declined = 0
+    for negative in sorted(load_negatives(), key=lambda n: n["difficulty"]):
+        answer, cites, audit = ask(negative["question"])
+        refused = not cites
+        declined += refused
+        print(f"  [{'DECLINED' if refused else 'ANSWERED'}] {negative['question']}")
+        print(f"      {answer.strip()[:190]}")
+        if audit.unsupported:
+            print(f"      !! cited but never retrieved: {', '.join(audit.unsupported)}")
+        print()
+
+    total = len(load_negatives())
+    print(f"declined {declined}/{total} out-of-scope questions\n")
+
+    print("ANSWERABLE (a refusal here is a false decline)\n")
+    control = load_eval_set()
+    false_declines = []
+    unsupported_cases = []
+    cross_referenced = []
+    for case in control:
+        answer, cites, audit = ask(case.question)
+        if not cites:
+            false_declines.append((case, answer))
+        if audit.unsupported:
+            unsupported_cases.append((case, audit.unsupported))
+        if audit.cross_referenced:
+            cross_referenced.append((case, audit.cross_referenced))
+
+    print(f"  answered {len(control) - len(false_declines)}/{len(control)}")
+    if false_declines:
+        print("\n  False declines, with what the model said:\n")
+        for case, answer in false_declines:
+            print(f"    [{case.category}] {case.question}")
+            print(f"      {answer.strip()[:230]}\n")
+
+    print(f"\nfalse declines      : {len(false_declines)}/{len(control)}")
+    print(f"unsupported cites   : {len(unsupported_cases)}/{len(control)}"
+          "   (cited, and absent from the excerpts entirely)")
+    for case, unsupported in unsupported_cases:
+        print(f"  !! {case.question} -> {', '.join(unsupported)}")
+    print(f"cross-referenced    : {len(cross_referenced)}/{len(control)}"
+          "   (named inside a retrieved provision, but its own text was not seen)")
+    for case, refs in cross_referenced:
+        print(f"   ~ {case.question} -> {', '.join(refs)}")
+
+
 def main():
     import sys
 
     import rag
 
-    modes = {"semantic", "bm25", "hybrid", "fusion", "warm", "compare"}
+    modes = {
+        "semantic",
+        "bm25",
+        "hybrid",
+        "fusion",
+        "warm",
+        "compare",
+        "support",
+        "refusal",
+    }
     which = sys.argv[1] if len(sys.argv) > 1 else "hybrid"
     if which not in modes:
         raise SystemExit(f"Unknown mode {which!r}. Use one of: {', '.join(sorted(modes))}.")
@@ -352,7 +505,9 @@ def main():
         from openai import OpenAI
 
         before = len(load_query_cache())
-        cache = warm_query_cache(OpenAI(), [case.question for case in cases])
+        questions = [case.question for case in cases]
+        questions += [negative["question"] for negative in load_negatives()]
+        cache = warm_query_cache(OpenAI(), questions)
         print(
             f"Query cache: {len(cache)} questions "
             f"({len(cache) - before} newly embedded) -> {QUERY_CACHE_FILE}"
@@ -361,6 +516,15 @@ def main():
         return
 
     matrix = rag.to_matrix(embeddings)
+
+    if which == "support":
+        report_support(chunks, embeddings, matrix)
+        return
+
+    if which == "refusal":
+        report_refusals(chunks, matrix)
+        return
+
     retrievers = {
         "semantic": lambda: cached_semantic_retriever(chunks, matrix),
         "bm25": lambda: bm25_retriever(chunks),

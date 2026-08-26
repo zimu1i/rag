@@ -12,6 +12,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+import groundedness
 import rag
 from chunking import Chunk
 
@@ -238,10 +239,70 @@ class TestGeneration:
 
         answer = rag.answer_question(client, "director duties?", retriever, verbose=False)
 
-        assert answer == "A test answer."
+        assert answer.text == "A test answer."
         sent = client.chat_calls[0]["messages"][1]["content"]
         assert "s. 122(1)" in sent
         assert "director duties?" in sent
+
+    def test_answer_carries_the_evidence_it_was_built_from(self, client, chunks):
+        """An answer and whether its citations were verified are not separable
+        for a legal tool; returning a bare string would let a caller show one
+        without the other."""
+        answer = rag.answer_question(
+            client, "anything", lambda q, k: chunks[:2], verbose=False
+        )
+
+        assert answer.retrieved == tuple(chunks[:2])
+        assert answer.audit is not None
+
+
+class TestAnswerWarnings:
+    def test_no_warnings_when_every_citation_was_retrieved(self, client, chunks):
+        answer = rag.Answer(
+            text="see s. 122(1)",
+            retrieved=(chunks[0],),
+            audit=groundedness.audit_citations("see s. 122(1)", [chunks[0]]),
+        )
+
+        assert answer.warnings() == []
+
+    def test_warns_loudly_about_a_citation_absent_from_the_excerpts(self, chunks):
+        text = "see s. 45(2)"
+        answer = rag.Answer(
+            text=text,
+            retrieved=(chunks[0],),
+            audit=groundedness.audit_citations(text, [chunks[0]]),
+        )
+
+        warnings = answer.warnings()
+
+        assert len(warnings) == 1
+        assert warnings[0].startswith("WARNING")
+        assert "s. 45(2)" in warnings[0]
+
+    def test_notes_a_cross_reference_without_calling_it_a_fabrication(self):
+        """The real case: explaining s. 190(1) surfaces s. 173, which s. 190(1)
+        itself names. Not invented, but its wording was never retrieved."""
+        retrieved = [
+            Chunk(
+                text="190 (1) ... amend its articles under section 173 or 174",
+                section="190",
+                subsection="1",
+            )
+        ]
+        text = "dissent applies to amendments under s. 173"
+        answer = rag.Answer(
+            text=text,
+            retrieved=tuple(retrieved),
+            audit=groundedness.audit_citations(text, retrieved),
+        )
+
+        warnings = answer.warnings()
+
+        assert len(warnings) == 1
+        assert warnings[0].startswith("Note")
+        assert "WARNING" not in warnings[0]
+        assert "s. 173" in warnings[0]
 
     def test_only_retrieved_chunks_reach_the_model(self, client, chunks):
         retriever = lambda question, k: [chunks[1]]

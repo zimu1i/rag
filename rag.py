@@ -8,23 +8,27 @@ Retrieval-augmented question answering over the Canada Business Corporations Act
 
 The pipeline is:
 
-    ingest.py    two-column bilingual PDF -> English lines with coordinates
-    cleanup.py   lines -> clean prose paragraphs
-    chunking.py  paragraphs -> citable chunks, one per provision
-    rag.py       embed, retrieve, answer                     <- this file
+    ingest.py        two-column bilingual PDF -> English lines with coordinates
+    cleanup.py       lines -> clean prose paragraphs
+    chunking.py      paragraphs -> citable chunks, one per provision
+    bm25.py          keyword retrieval
+    hybrid.py        rank fusion + structured citation lookup
+    groundedness.py  checks on what the model claims
+    rag.py           embed, retrieve, answer                 <- this file
 
-Retrieval is currently semantic only. BM25 and the hybrid merge are not built
-yet; see README.md for the current status of each component.
+See README.md for the measured status of each component.
 """
 
 import hashlib
 import json
 import os
+from dataclasses import dataclass
 
 import numpy as np
 from openai import OpenAI
 
 import bm25
+import groundedness
 import hybrid
 from chunking import Chunk, chunk_paragraphs
 from cleanup import to_paragraphs
@@ -212,7 +216,51 @@ def build_context(chunks):
     return "\n\n".join(f"[{chunk.citation}]\n{chunk.text}" for chunk in chunks)
 
 
-def answer_question(client, question, retriever, top_k=3, verbose=True):
+# How many provisions to put in front of the model.
+#
+# Raised from 3 after a measured false decline: asked what happens when a
+# director has a conflict of interest, retrieval returned s. 83(1) and s. 83(2)
+# -- which say "conflict of interest" verbatim but govern trustees -- at ranks 1
+# and 3, with only one director provision between them. The model concluded the
+# excerpts did not address the question. Ranks 4 and 5 were s. 120(6) and
+# s. 120(7), both directly on point, so a depth of 5 changes the balance of the
+# context from 1-against-2 to 3-against-2.
+#
+# There is no retrieval cost to the extra depth: hit@5 equals hit@3 at 0.96.
+DEFAULT_TOP_K = 5
+
+
+@dataclass(frozen=True)
+class Answer:
+    """An answer together with the evidence it was built from.
+
+    The audit travels with the text on purpose. An answer and the question of
+    whether its citations were verified are not separable for a legal tool, and
+    returning a bare string would let a caller display one without the other.
+    """
+
+    text: str
+    retrieved: tuple
+    audit: groundedness.CitationAudit
+
+    def warnings(self) -> list[str]:
+        """Caveats a reader needs before relying on this answer."""
+        notes = []
+        if self.audit.unsupported:
+            notes.append(
+                f"WARNING: cites {', '.join(self.audit.unsupported)}, which "
+                f"appear nowhere in the retrieved provisions. Treat as unverified."
+            )
+        if self.audit.cross_referenced:
+            notes.append(
+                f"Note: refers to {', '.join(self.audit.cross_referenced)}, "
+                f"mentioned inside a retrieved provision but not retrieved. "
+                f"Their wording was not checked."
+            )
+        return notes
+
+
+def answer_question(client, question, retriever, top_k=DEFAULT_TOP_K, verbose=True):
     """Retrieve, then answer from what was retrieved.
 
     Takes a retriever rather than an index so that generation does not depend on
@@ -237,7 +285,12 @@ def answer_question(client, question, retriever, top_k=3, verbose=True):
             },
         ],
     )
-    return response.choices[0].message.content
+    text = response.choices[0].message.content
+    return Answer(
+        text=text,
+        retrieved=tuple(retrieved),
+        audit=groundedness.audit_citations(text, retrieved),
+    )
 
 
 # --------------------------------------------------------------------------
@@ -280,7 +333,10 @@ def main():
             break
         if not question:
             continue
-        print(f"\nAnswer: {answer_question(client, question, retriever)}\n")
+        answer = answer_question(client, question, retriever)
+        print(f"\nAnswer: {answer.text}\n")
+        for warning in answer.warnings():
+            print(f"  {warning}\n")
 
 
 # Nothing runs on import: the test suite imports this module, and building the

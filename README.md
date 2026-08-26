@@ -23,7 +23,8 @@ not the intended design.
 | Generation (GPT-4o-mini) | Working — answers cite the provisions they rely on |
 | BM25 keyword retrieval | Working — hand-built, indexes citations and headings |
 | Hybrid merge / ranking | Working — reciprocal rank fusion + structured citation lookup |
-| Groundedness / low-support refusal | **Not built** |
+| Citation validation | Working — every answer's citations are audited against what was retrieved |
+| Low-support refusal threshold | **Tested and rejected** — no signal separates in from out of scope |
 | Evaluation set + retrieval metrics | Working — 26 labelled questions in five categories |
 
 The index holds 1,125 chunks, one per provision, each labelled with its section
@@ -31,16 +32,17 @@ The index holds 1,125 chunks, one per provision, each labelled with its section
 
 ### Known issues
 
-- **`rag.py` still uses semantic retrieval only.** Hybrid retrieval is built,
-  tested and measured, but the interactive question loop has not been switched
-  over to it yet.
 - **One evaluation question still fails.** "What can I do if the company is
   treating me unfairly as a minority shareholder?" does not retrieve s. 241.
   The distinctive words ("oppressive", "unfairly prejudicial") sit 70% of the
   way through a 675-character provision, diluted in its embedding.
-- **Nothing verifies groundedness.** The model is instructed to answer only from
-  the retrieved excerpts and to decline otherwise, but no code checks whether it
-  did. Until that exists, treat answers as unverified.
+- **Nothing detects a jurisdictional error.** If the system answered a question
+  about Delaware or Ontario corporate law using correctly-cited CBCA provisions,
+  every citation would be real and genuinely retrieved, and no guard would fire.
+  This has not been observed, but it is not covered.
+- **Nothing checks that an answer faithfully paraphrases what it cites.** A model
+  can cite s. 122(1) accurately and still misdescribe it. Catching that needs a
+  verifier pass, which is not built.
 - **A provision's substance can be split from its hook.** Chunking follows the
   Act's subsections, but a question is usually about a *section*. s. 241(1) says
   only that "a complainant may apply to a court for an order under this section";
@@ -140,6 +142,43 @@ Two results worth reading carefully:
   reported figures are optimistic. RRF is kept at its standard k=60 with equal
   weights rather than the best-scoring configuration, to limit that. A proper
   dev/test split would be better and needs a larger question set.
+
+## Refusing to answer
+
+The original design called for a groundedness check that declined "low-support"
+queries. **That threshold could not be built, and the reason is worth recording.**
+
+`evaluation.py support` scores every question in `eval_set.json` against the 11
+out-of-scope questions in `eval_negatives.json`. Five candidate support signals
+were tested; all of them overlap:
+
+| signal | lowest answerable | highest out-of-scope | separation |
+| --- | --- | --- | --- |
+| max cosine | 0.487 | 0.633 | −0.147 |
+| top-1 minus top-5 mean | 0.009 | 0.120 | −0.111 |
+| peak vs corpus mean | 0.160 | 0.305 | −0.145 |
+| mean of top 3 | 0.465 | 0.588 | −0.123 |
+| top BM25 score | 6.71 | 13.89 | −7.18 |
+
+The cause is structural, not a matter of tuning. "What are the requirements to
+incorporate under the *Ontario* Business Corporations Act?" is semantically
+almost identical to a legitimate CBCA question — retrieval similarity measures
+topical closeness, not which statute governs. Worse, the best signal is
+*anti-correlated* with answer quality on the one category the system handles
+perfectly: section-number queries score 0.354–0.485, the lowest of any answerable
+group, because a citation query is lexically unlike the provision it names.
+
+So no threshold ships. What is relied on instead:
+
+1. **A prompt restricting the model to the retrieved excerpts.** Measured with
+   `evaluation.py refusal`: 11 of 11 out-of-scope questions were declined,
+   including near-misses about Delaware, Ontario, securities law and bankruptcy.
+2. **Deterministic citation validation** (`groundedness.py`): every provision an
+   answer cites must appear in what was retrieved.
+
+Caveats, because 11/11 is easy to over-read: the negative set is small and was
+not written adversarially, and neither guard detects a jurisdictional error or an
+unfaithful paraphrase of a correctly-cited provision.
 
 ## Running tests
 
