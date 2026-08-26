@@ -24,6 +24,8 @@ import os
 import numpy as np
 from openai import OpenAI
 
+import bm25
+import hybrid
 from chunking import Chunk, chunk_paragraphs
 from cleanup import to_paragraphs
 from ingest import extract_bilingual
@@ -198,21 +200,31 @@ Answer only from the provided excerpts. Each excerpt is labelled with the provis
 - This is information about the legislation, not legal advice."""
 
 
-def build_context(results):
-    """Format retrieved chunks for the model, labelled by citation."""
-    parts = []
-    for score, chunk in results:
-        parts.append(f"[{chunk.citation}, relevance {score:.2f}]\n{chunk.text}")
-    return "\n\n".join(parts)
+def build_context(chunks):
+    """Format retrieved chunks for the model, labelled by citation.
+
+    No relevance score is shown. The old prompt printed a cosine similarity and
+    told the model to prefer higher-scoring excerpts, but results now come from
+    rank fusion, whose scores are ~0.016 and are not comparable across queries,
+    and from citation lookup, which has no score at all. Presenting any of those
+    as a confidence figure would be inventing precision that does not exist.
+    """
+    return "\n\n".join(f"[{chunk.citation}]\n{chunk.text}" for chunk in chunks)
 
 
-def answer_question(client, question, chunks, matrix, top_k=3, verbose=True):
-    results = find_chunks(embed_query(client, question), chunks, matrix, top_k)
+def answer_question(client, question, retriever, top_k=3, verbose=True):
+    """Retrieve, then answer from what was retrieved.
+
+    Takes a retriever rather than an index so that generation does not depend on
+    how retrieval works -- the same function serves semantic, hybrid, or a stub
+    in tests.
+    """
+    retrieved = retriever(question, top_k)
 
     if verbose:
         print("--- Retrieved ---")
-        for score, chunk in results:
-            print(f"  {score:.3f}  [{chunk.citation}]  {chunk.text[:90]}...")
+        for position, chunk in enumerate(retrieved, start=1):
+            print(f"  {position}. [{chunk.citation}]  {chunk.text[:88]}...")
         print()
 
     response = client.chat.completions.create(
@@ -221,7 +233,7 @@ def answer_question(client, question, chunks, matrix, top_k=3, verbose=True):
             {"role": "system", "content": SYSTEM_PROMPT},
             {
                 "role": "user",
-                "content": f"Excerpts:\n{build_context(results)}\n\nQuestion: {question}",
+                "content": f"Excerpts:\n{build_context(retrieved)}\n\nQuestion: {question}",
             },
         ],
     )
@@ -233,6 +245,20 @@ def answer_question(client, question, chunks, matrix, top_k=3, verbose=True):
 # --------------------------------------------------------------------------
 
 
+def build_retriever(client, chunks, matrix):
+    """Assemble the live hybrid retriever: semantic + BM25 + citation lookup."""
+    index = bm25.build_index(chunks)
+
+    def semantic(question, k):
+        query = embed_query(client, question)
+        return [chunk for _, chunk in find_chunks(query, chunks, matrix, top_k=k)]
+
+    def keyword(question, k):
+        return [chunk for _, chunk in index.search(question, top_k=k)]
+
+    return hybrid.build_retriever(chunks, semantic, keyword)
+
+
 def main():
     client = OpenAI()
 
@@ -241,10 +267,11 @@ def main():
     print(f"{len(chunks)} chunks.")
 
     chunks, embeddings = get_embeddings(client, chunks)
-    matrix = to_matrix(embeddings)
+    retriever = build_retriever(client, chunks, to_matrix(embeddings))
 
     print("\n=== LegalMind ready ===")
     print("Ask a question about the Canada Business Corporations Act.")
+    print("Retrieval: semantic + BM25 rank fusion, with citation lookup.")
     print("Type 'quit' to exit.\n")
 
     while True:
@@ -253,7 +280,7 @@ def main():
             break
         if not question:
             continue
-        print(f"\nAnswer: {answer_question(client, question, chunks, matrix)}\n")
+        print(f"\nAnswer: {answer_question(client, question, retriever)}\n")
 
 
 # Nothing runs on import: the test suite imports this module, and building the

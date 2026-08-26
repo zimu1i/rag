@@ -220,36 +220,70 @@ class TestRetrieval:
 
 class TestGeneration:
     def test_context_labels_every_excerpt_with_its_citation(self, chunks):
-        context = rag.build_context([(0.87, chunks[0]), (0.61, chunks[1])])
+        context = rag.build_context([chunks[0], chunks[1]])
 
-        assert "[s. 122(1), relevance 0.87]" in context
-        assert "[s. 24(1), relevance 0.61]" in context
+        assert "[s. 122(1)]" in context
+        assert "[s. 24(1)]" in context
+
+    def test_context_shows_no_relevance_score(self, chunks):
+        """Results come from rank fusion (scores ~0.016, not comparable across
+        queries) and citation lookup (no score at all). Printing either as a
+        confidence figure would invent precision that does not exist."""
+        context = rag.build_context([chunks[0]])
+
+        assert "relevance" not in context.lower()
 
     def test_answer_question_passes_context_and_returns_the_reply(self, client, chunks):
-        matrix = rag.to_matrix(rag.embed_texts(client, [c.text for c in chunks]))
+        retriever = lambda question, k: chunks[:k]
 
-        answer = rag.answer_question(client, "director duties?", chunks, matrix, verbose=False)
+        answer = rag.answer_question(client, "director duties?", retriever, verbose=False)
 
         assert answer == "A test answer."
         sent = client.chat_calls[0]["messages"][1]["content"]
         assert "s. 122(1)" in sent
         assert "director duties?" in sent
 
-    def test_system_prompt_requires_citations_and_refusal(self, client, chunks):
-        matrix = rag.to_matrix(rag.embed_texts(client, [c.text for c in chunks]))
+    def test_only_retrieved_chunks_reach_the_model(self, client, chunks):
+        retriever = lambda question, k: [chunks[1]]
 
-        rag.answer_question(client, "anything", chunks, matrix, verbose=False)
+        rag.answer_question(client, "shares?", retriever, verbose=False)
+
+        sent = client.chat_calls[0]["messages"][1]["content"]
+        assert "s. 24(1)" in sent
+        assert "s. 122(1)" not in sent
+
+    def test_system_prompt_requires_citations_and_refusal(self, client, chunks):
+        rag.answer_question(client, "anything", lambda q, k: chunks, verbose=False)
 
         system = client.chat_calls[0]["messages"][0]["content"]
         assert "Cite the provision" in system
         assert "say so plainly" in system
 
     def test_uses_the_configured_model(self, client, chunks):
-        matrix = rag.to_matrix(rag.embed_texts(client, [c.text for c in chunks]))
-
-        rag.answer_question(client, "anything", chunks, matrix, verbose=False)
+        rag.answer_question(client, "anything", lambda q, k: chunks, verbose=False)
 
         assert client.chat_calls[0]["model"] == rag.CHAT_MODEL
+
+
+class TestBuildRetriever:
+    """The wiring: the interactive loop must actually use hybrid retrieval."""
+
+    def test_citation_query_is_answered_from_metadata(self, client, chunks):
+        matrix = rag.to_matrix(rag.embed_texts(client, [c.text for c in chunks]))
+
+        retriever = rag.build_retriever(client, chunks, matrix)
+
+        assert retriever("what does section 122 require?", 1)[0].citation == "s. 122(1)"
+
+    def test_meaning_based_query_uses_both_retrievers(self, client, chunks):
+        matrix = rag.to_matrix(rag.embed_texts(client, [c.text for c in chunks]))
+        client.embedding_calls.clear()
+
+        retriever = rag.build_retriever(client, chunks, matrix)
+        results = retriever("a meeting of shareholders", 3)
+
+        assert client.embedding_calls, "semantic retrieval should embed the query"
+        assert results, "fusion should return candidates"
 
 
 @pytest.mark.slow
