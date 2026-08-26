@@ -1,0 +1,157 @@
+{
+  "_comment": [
+    "Retrieval evaluation set for LegalMind. DRAFTED BY CLAUDE, REVIEWED BY MUZI LI.",
+    "Every expected citation was verified against the text of C-44 as indexed.",
+    "",
+    "Categories exist so that a change to retrieval can be judged per query type,",
+    "not just on an average that hides which kind of question got worse:",
+    "  paraphrase     - plain language, no statutory vocabulary. Semantic should win.",
+    "  statutory_term - uses the Act's own terms of art.",
+    "  section_number - names a provision by number. Embeddings blur these.",
+    "  definition     - asks for a defined term from s. 2(1).",
+    "  multi_provision- correct answer needs more than one provision.",
+    "",
+    "'term' narrows a match to one definition chunk, since ~39 chunks share the",
+    "citation s. 2(1)."
+  ],
+  "cases": [
+    {
+      "question": "what happens if a director has a conflict of interest?",
+      "category": "paraphrase",
+      "expected": [{"citation": "s. 120(1)"}]
+    },
+    {
+      "question": "what standard of care must directors meet?",
+      "category": "paraphrase",
+      "expected": [{"citation": "s. 122(1)"}]
+    },
+    {
+      "question": "can a shareholder sue on behalf of the corporation?",
+      "category": "paraphrase",
+      "expected": [{"citation": "s. 239(1)"}]
+    },
+    {
+      "question": "what can I do if the company is treating me unfairly as a minority shareholder?",
+      "category": "paraphrase",
+      "_note": [
+        "s. 241(1) is only the procedural hook -- 'a complainant may apply to a court",
+        "for an order under this section' -- and contains none of the words a reader",
+        "would search for. The grounds ('oppressive', 'unfairly prejudicial') are in",
+        "s. 241(2). Retrieving either serves the question."
+      ],
+      "expected": [
+        {"any_of": [{"citation": "s. 241(1)"}, {"citation": "s. 241(2)"}]}
+      ]
+    },
+    {
+      "question": "where does a company have to keep its head office?",
+      "category": "paraphrase",
+      "expected": [{"citation": "s. 19(1)"}]
+    },
+    {
+      "question": "how many directors have to live in Canada?",
+      "category": "paraphrase",
+      "expected": [{"citation": "s. 105(3)"}]
+    },
+    {
+      "question": "who gets to make the company's internal rules?",
+      "category": "paraphrase",
+      "expected": [{"citation": "s. 103(1)"}]
+    },
+    {
+      "question": "what does section 122 require?",
+      "category": "section_number",
+      "expected": [{"citation": "s. 122(1)"}]
+    },
+    {
+      "question": "what is section 241 about?",
+      "category": "section_number",
+      "expected": [{"citation": "s. 241(1)"}]
+    },
+    {
+      "question": "explain subsection 190(1)",
+      "category": "section_number",
+      "expected": [{"citation": "s. 190(1)"}]
+    },
+    {
+      "question": "what does section 146 say?",
+      "category": "section_number",
+      "expected": [{"citation": "s. 146(1)"}]
+    },
+    {
+      "question": "what are the requirements in section 6?",
+      "category": "section_number",
+      "expected": [{"citation": "s. 6(1)"}]
+    },
+    {
+      "question": "what obligations does section 155 impose?",
+      "category": "section_number",
+      "expected": [{"citation": "s. 155(1)"}]
+    },
+    {
+      "question": "what is a unanimous shareholder agreement and what can it do?",
+      "category": "statutory_term",
+      "expected": [{"citation": "s. 146(1)"}]
+    },
+    {
+      "question": "when may a shareholder exercise a right to dissent?",
+      "category": "statutory_term",
+      "expected": [{"citation": "s. 190(1)"}]
+    },
+    {
+      "question": "who may a corporation indemnify?",
+      "category": "statutory_term",
+      "expected": [{"citation": "s. 124(1)"}]
+    },
+    {
+      "question": "what constitutes a quorum at a meeting of shareholders?",
+      "category": "statutory_term",
+      "expected": [{"citation": "s. 139(1)"}]
+    },
+    {
+      "question": "what are the restrictions on soliciting proxies?",
+      "category": "statutory_term",
+      "expected": [{"citation": "s. 150(1)"}]
+    },
+    {
+      "question": "what does affiliate mean in this Act?",
+      "category": "definition",
+      "expected": [{"citation": "s. 2(1)", "term": "affiliate"}]
+    },
+    {
+      "question": "how is auditor defined?",
+      "category": "definition",
+      "expected": [{"citation": "s. 2(1)", "term": "auditor"}]
+    },
+    {
+      "question": "what is a distributing corporation?",
+      "category": "definition",
+      "expected": [{"citation": "s. 2(1)", "term": "distributing corporation"}]
+    },
+    {
+      "question": "what counts as a special resolution?",
+      "category": "definition",
+      "expected": [{"citation": "s. 2(1)", "term": "special resolution"}]
+    },
+    {
+      "question": "what are the duties of directors in managing the corporation?",
+      "category": "multi_provision",
+      "expected": [{"citation": "s. 102(1)"}, {"citation": "s. 122(1)"}]
+    },
+    {
+      "question": "how must shareholders be notified of a meeting and what quorum is needed?",
+      "category": "multi_provision",
+      "expected": [{"citation": "s. 135(1)"}, {"citation": "s. 139(1)"}]
+    },
+    {
+      "question": "what financial statements must be put before shareholders and who audits them?",
+      "category": "multi_provision",
+      "expected": [{"citation": "s. 155(1)"}, {"citation": "s. 162(1)"}]
+    },
+    {
+      "question": "how can a corporation change its articles?",
+      "category": "multi_provision",
+      "expected": [{"citation": "s. 173(1)"}]
+    }
+  ]
+}
