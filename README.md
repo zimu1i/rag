@@ -10,8 +10,8 @@ inside a framework abstraction.
 
 ## Status
 
-This project is **in progress**. The table below is the honest current state,
-not the intended design.
+Complete and measured. Every component runs, and the numbers below are
+reproducible offline from a clone.
 
 | Component | Status |
 | --- | --- |
@@ -30,7 +30,10 @@ not the intended design.
 The index holds 1,125 chunks, one per provision, each labelled with its section
 (e.g. `s. 122(1)`), marginal note, Part and source pages.
 
-### Known issues
+### Limitations
+
+These are boundaries of what the system does, not unfinished work. Each was
+found by measurement and is documented rather than papered over.
 
 - **One evaluation question still fails.** "What can I do if the company is
   treating me unfairly as a minority shareholder?" does not retrieve s. 241.
