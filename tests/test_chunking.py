@@ -7,15 +7,16 @@ can be cited, and nothing that is not currently law gets indexed.
 
 import pytest
 
-from chunking import (
+from legalmind.chunking import (
     Chunk,
     MAX_CHUNK_CHARS,
     chunk_paragraphs,
     is_heading,
     merge_page_breaks,
 )
-from cleanup import Paragraph, to_paragraphs
-from ingest import extract_bilingual
+from legalmind.cleanup import Paragraph, to_paragraphs
+from legalmind import ACT_PDF
+from legalmind.ingest import extract_bilingual
 
 
 def para(text, page=20, block=0):
@@ -226,7 +227,7 @@ class TestChunkParagraphs:
 class TestRealAct:
     @pytest.fixture(scope="class")
     def chunks(self):
-        act = extract_bilingual("C-44.pdf")
+        act = extract_bilingual(str(ACT_PDF))
         return chunk_paragraphs(to_paragraphs(act.left, act.page_height))
 
     def test_every_chunk_can_be_cited(self, chunks):

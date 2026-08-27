@@ -12,9 +12,9 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-import groundedness
-import rag
-from chunking import Chunk
+from legalmind import groundedness
+from legalmind import rag
+from legalmind.chunking import Chunk
 
 
 def vector_for(text):

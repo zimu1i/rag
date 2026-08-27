@@ -24,7 +24,9 @@ import json
 import os
 from dataclasses import dataclass
 
-DEFAULT_EVAL_SET = "eval_set.json"
+from legalmind import DATA_DIR
+
+DEFAULT_EVAL_SET = DATA_DIR / "eval_set.json"
 DEFAULT_K_VALUES = (1, 3, 5)
 
 # Query embeddings for the eval set, cached to disk.
@@ -33,7 +35,7 @@ DEFAULT_K_VALUES = (1, 3, 5)
 # needs an API key, and makes retrieval experiments non-reproducible. With this
 # cached, comparing fusion variants is free, offline and deterministic -- which
 # matters because tuning a retriever means running the eval many times.
-QUERY_CACHE_FILE = "query_embeddings.json"
+QUERY_CACHE_FILE = DATA_DIR / "query_embeddings.json"
 
 
 @dataclass(frozen=True)
@@ -152,7 +154,7 @@ def load_eval_set(path: str = DEFAULT_EVAL_SET) -> list[EvalCase]:
     ]
 
 
-DEFAULT_NEGATIVES = "eval_negatives.json"
+DEFAULT_NEGATIVES = DATA_DIR / "eval_negatives.json"
 
 
 def load_negatives(path: str = DEFAULT_NEGATIVES) -> list[dict]:
@@ -251,7 +253,7 @@ def format_report(results, k_values=DEFAULT_K_VALUES) -> str:
 
 def semantic_retriever(client, chunks, matrix):
     """Build a retriever backed by the current embedding index."""
-    import rag
+    from legalmind import rag
 
     def retrieve(question, k):
         query = rag.embed_query(client, question)
@@ -266,7 +268,7 @@ def load_query_cache(path: str = QUERY_CACHE_FILE) -> dict:
     A cache built with a different embedding model is discarded rather than
     mixed, since vectors from two models are not comparable.
     """
-    import rag
+    from legalmind import rag
 
     if not os.path.exists(path):
         return {}
@@ -278,7 +280,7 @@ def load_query_cache(path: str = QUERY_CACHE_FILE) -> dict:
 
 
 def save_query_cache(embeddings: dict, path: str = QUERY_CACHE_FILE) -> None:
-    import rag
+    from legalmind import rag
 
     with open(path, "w") as handle:
         json.dump({"model": rag.EMBEDDING_MODEL, "embeddings": embeddings}, handle)
@@ -286,7 +288,7 @@ def save_query_cache(embeddings: dict, path: str = QUERY_CACHE_FILE) -> None:
 
 def warm_query_cache(client, questions, path: str = QUERY_CACHE_FILE) -> dict:
     """Embed any question not already cached. The only step that needs an API key."""
-    import rag
+    from legalmind import rag
 
     cache = load_query_cache(path)
     missing = [question for question in questions if question not in cache]
@@ -303,7 +305,7 @@ def cached_semantic_retriever(chunks, matrix, path: str = QUERY_CACHE_FILE):
     Raises on an uncached question rather than silently falling back to a live
     call, so a missing entry surfaces as an error instead of an unexpected bill.
     """
-    import rag
+    from legalmind import rag
 
     cache = load_query_cache(path)
 
@@ -320,7 +322,7 @@ def cached_semantic_retriever(chunks, matrix, path: str = QUERY_CACHE_FILE):
 
 def bm25_retriever(chunks):
     """Build a keyword retriever. Needs no API calls, so it runs offline."""
-    import bm25
+    from legalmind import bm25
 
     index = bm25.build_index(chunks)
 
@@ -332,7 +334,7 @@ def bm25_retriever(chunks):
 
 def hybrid_retriever(chunks, matrix, path: str = QUERY_CACHE_FILE, use_structured=True):
     """Rank fusion over semantic and keyword retrieval, plus citation lookup."""
-    import hybrid
+    from legalmind import hybrid
 
     return hybrid.build_retriever(
         chunks,
@@ -349,7 +351,7 @@ def report_support(chunks, embeddings, matrix):
     at all. If the two distributions overlap, no single cutoff will work and the
     check needs a different signal.
     """
-    import groundedness
+    from legalmind import groundedness
 
     cache = load_query_cache()
     retriever = hybrid_retriever(chunks, matrix)
@@ -414,8 +416,8 @@ def report_refusals(chunks, matrix):
     proxy rather than a definition -- it is printed alongside each answer so the
     classification can be checked by eye rather than trusted.
     """
-    import groundedness
-    import rag
+    from legalmind import groundedness
+    from legalmind import rag
     from openai import OpenAI
 
     client = OpenAI()
@@ -476,7 +478,7 @@ def report_refusals(chunks, matrix):
 def main():
     import sys
 
-    import rag
+    from legalmind import rag
 
     modes = {
         "semantic",

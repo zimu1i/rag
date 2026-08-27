@@ -10,9 +10,9 @@ from pathlib import Path
 
 import pytest
 
-import evaluation
-from chunking import Chunk
-from evaluation import (
+from legalmind import evaluation
+from legalmind.chunking import Chunk
+from legalmind.evaluation import (
     EvalCase,
     Expectation,
     Target,
@@ -280,7 +280,7 @@ class TestQueryCache:
         A silent fallback to a live call would turn an offline experiment into
         an unexpected bill, and would break reproducibility invisibly.
         """
-        import rag
+        from legalmind import rag
 
         path = tmp_path / "queries.json"
         evaluation.warm_query_cache(client, ["known question"], path)
@@ -349,7 +349,7 @@ class TestEvalSetAgainstTheRealIndex:
 
     @pytest.fixture(scope="class")
     def chunks(self):
-        import rag
+        from legalmind import rag
 
         return rag.build_chunks()
 

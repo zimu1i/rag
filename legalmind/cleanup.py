@@ -29,7 +29,7 @@ import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 
-from ingest import Line
+from legalmind.ingest import Line
 
 # A line whose exact text repeats on at least this share of pages is running
 # header or footer boilerplate.

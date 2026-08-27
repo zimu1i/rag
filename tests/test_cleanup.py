@@ -6,8 +6,8 @@ no network. The slow tests assert properties of the real Act.
 
 import pytest
 
-import cleanup
-from cleanup import (
+from legalmind import cleanup
+from legalmind.cleanup import (
     CleanupError,
     find_front_matter,
     hyphenated_vocabulary,
@@ -15,7 +15,8 @@ from cleanup import (
     strip_running_headers,
     to_paragraphs,
 )
-from ingest import Line, extract_bilingual
+from legalmind import ACT_PDF
+from legalmind.ingest import Line, extract_bilingual
 
 PAGE_HEIGHT = 792.0
 
@@ -248,7 +249,7 @@ class TestToParagraphs:
 class TestRealAct:
     @pytest.fixture(scope="class")
     def paragraphs(self):
-        act = extract_bilingual("C-44.pdf")
+        act = extract_bilingual(str(ACT_PDF))
         return to_paragraphs(act.left, act.page_height)
 
     @pytest.fixture(scope="class")

@@ -6,8 +6,8 @@ rankings, so every assertion about fusion is exact rather than approximate.
 
 import pytest
 
-from chunking import Chunk
-from hybrid import (
+from legalmind.chunking import Chunk
+from legalmind.hybrid import (
     build_retriever,
     parse_citation_query,
     reciprocal_rank_fusion,
@@ -202,9 +202,9 @@ class TestBuildRetriever:
 class TestRealAct:
     @pytest.fixture(scope="class")
     def pieces(self):
-        import bm25
-        import evaluation
-        import rag
+        from legalmind import bm25
+        from legalmind import evaluation
+        from legalmind import rag
 
         cached = rag.load_cache()
         if cached is None:

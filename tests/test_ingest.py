@@ -10,7 +10,8 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from ingest import (
+from legalmind import ACT_PDF
+from legalmind.ingest import (
     ColumnLayout,
     Line,
     LayoutError,
@@ -203,7 +204,7 @@ class TestRealAct:
 
     @pytest.fixture(scope="class")
     def act(self):
-        return extract_bilingual("C-44.pdf")
+        return extract_bilingual(str(ACT_PDF))
 
     def test_detects_the_expected_margins(self, act):
         assert act.layout.left_margin == 48.0

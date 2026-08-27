@@ -9,9 +9,9 @@ import math
 
 import pytest
 
-import bm25
-from bm25 import build_index, indexed_text, tokenize
-from chunking import Chunk
+from legalmind import bm25
+from legalmind.bm25 import build_index, indexed_text, tokenize
+from legalmind.chunking import Chunk
 
 
 def chunk(text, section=None, subsection=None, heading=None):
@@ -176,7 +176,7 @@ class TestBuildIndex:
 class TestRealAct:
     @pytest.fixture(scope="class")
     def index(self):
-        import rag
+        from legalmind import rag
 
         return build_index(rag.build_chunks())
 

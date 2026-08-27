@@ -27,15 +27,15 @@ from dataclasses import dataclass
 import numpy as np
 from openai import OpenAI
 
-import bm25
-import groundedness
-import hybrid
-from chunking import Chunk, chunk_paragraphs
-from cleanup import to_paragraphs
-from ingest import extract_bilingual
+from legalmind import ACT_PDF, EMBEDDING_CACHE, bm25
+from legalmind import groundedness
+from legalmind import hybrid
+from legalmind.chunking import Chunk, chunk_paragraphs
+from legalmind.cleanup import to_paragraphs
+from legalmind.ingest import extract_bilingual
 
-PDF_PATH = "C-44.pdf"
-CACHE_FILE = "embeddings.json"
+PDF_PATH = ACT_PDF
+CACHE_FILE = EMBEDDING_CACHE
 EMBEDDING_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-4o-mini"
 

@@ -32,7 +32,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from cleanup import Paragraph
+from legalmind.cleanup import Paragraph
 
 # Provisions larger than this are split at their internal item boundaries.
 #

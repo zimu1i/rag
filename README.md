@@ -57,6 +57,36 @@ The index holds 1,125 chunks, one per provision, each labelled with its section
 - **The French column is extracted but not indexed.** Only the English text is
   embedded.
 
+## Project structure
+
+```
+.
+├── main.py                     ask questions at a prompt
+├── evaluate.py                 run the evaluation harness
+│
+├── legalmind/
+│   ├── ingest.py               bilingual two-column PDF -> lines with coordinates
+│   ├── cleanup.py              lines -> clean prose paragraphs
+│   ├── chunking.py             paragraphs -> citable chunks, one per provision
+│   ├── bm25.py                 keyword retrieval, built from scratch
+│   ├── hybrid.py               rank fusion plus structured citation lookup
+│   ├── groundedness.py         citation auditing and support scoring
+│   ├── rag.py                  embedding, retrieval, generation
+│   └── evaluation.py           metrics, ablations, refusal measurement
+│
+├── data/
+│   ├── C-44.pdf                the Act, as published by Justice Canada
+│   ├── eval_set.json           26 labelled questions in five categories
+│   ├── eval_negatives.json     11 out-of-scope questions
+│   └── query_embeddings.json   cached query vectors, so evaluation runs offline
+│
+└── tests/                      244 tests, no network or API key required
+```
+
+Data flows in one direction: `ingest` to `cleanup` to `chunking` produces the
+index, and `rag` combines `bm25` and `hybrid` to answer against it. Nothing in
+`legalmind/` reads from the working directory, so the tools run from anywhere.
+
 ## Setup
 
 Requires Python 3.13 and an OpenAI API key.
@@ -80,11 +110,11 @@ export OPENAI_API_KEY="sk-..."
 ## Usage
 
 ```bash
-./venv/bin/python rag.py
+./venv/bin/python main.py
 ```
 
 Calling the venv's interpreter directly is deliberate: if you have Anaconda or
-another Python on your `PATH`, a bare `python rag.py` will pick that one up and
+another Python on your `PATH`, a bare `python main.py` will pick that one up and
 fail with `ModuleNotFoundError: No module named 'openai'`.
 
 On first run this embeds the Act and writes `embeddings.json` (gitignored):
@@ -98,15 +128,15 @@ Ask questions at the prompt; type `quit` to exit.
 ## Measuring retrieval
 
 ```bash
-./venv/bin/python evaluation.py
+./venv/bin/python evaluate.py hybrid
 ```
 
-Runs 26 labelled questions from `eval_set.json` and reports recall and MRR per
+Runs 26 labelled questions from `data/eval_set.json` and reports recall and MRR per
 question category. Categories are reported separately on purpose: retrieval that
 is strong on paraphrased questions and blind to section numbers scores
 respectably overall while failing the query a lawyer is most likely to type.
 
-`./venv/bin/python evaluation.py compare` runs the ablation:
+`./venv/bin/python evaluate.py compare` runs the ablation:
 
 | retriever | hit@1 | hit@3 | hit@5 | MRR |
 | --- | --- | --- | --- | --- |
@@ -148,8 +178,8 @@ Two results worth reading carefully:
 The original design called for a groundedness check that declined "low-support"
 queries. **That threshold could not be built, and the reason is worth recording.**
 
-`evaluation.py support` scores every question in `eval_set.json` against the 11
-out-of-scope questions in `eval_negatives.json`. Five candidate support signals
+`evaluate.py support` scores every question in `data/eval_set.json` against the 11
+out-of-scope questions in `data/eval_negatives.json`. Five candidate support signals
 were tested; all of them overlap:
 
 | signal | lowest answerable | highest out-of-scope | separation |
@@ -171,7 +201,7 @@ group, because a citation query is lexically unlike the provision it names.
 So no threshold ships. What is relied on instead:
 
 1. **A prompt restricting the model to the retrieved excerpts.** Measured with
-   `evaluation.py refusal`: 11 of 11 out-of-scope questions were declined,
+   `evaluate.py refusal`: 11 of 11 out-of-scope questions were declined,
    including near-misses about Delaware, Ontario, securities law and bankruptcy.
 2. **Deterministic citation validation** (`groundedness.py`): every provision an
    answer cites must appear in what was retrieved.

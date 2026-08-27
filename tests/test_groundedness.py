@@ -7,8 +7,8 @@ embeddings from an API, no tolerance windows.
 import numpy as np
 import pytest
 
-from chunking import Chunk
-from groundedness import (
+from legalmind.chunking import Chunk
+from legalmind.groundedness import (
     audit_citations,
     cited_provisions,
     support_score,
@@ -180,7 +180,7 @@ class TestEvalNegatives:
 
     @pytest.fixture(scope="class")
     def negatives(self):
-        import evaluation
+        from legalmind import evaluation
 
         return evaluation.load_negatives()
 
@@ -202,7 +202,7 @@ class TestEvalNegatives:
         assert len(near) >= 4
 
     def test_does_not_overlap_the_answerable_set(self, negatives):
-        import evaluation
+        from legalmind import evaluation
 
         answerable = {case.question for case in evaluation.load_eval_set()}
 
