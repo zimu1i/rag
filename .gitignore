@@ -23,3 +23,6 @@ embeddings.json
 # Note: tests/fixtures/attention-is-all-you-need.pdf is intentionally tracked.
 # It is a leftover from when this repo was a RAG over that paper, and is now
 # used as a real single-column negative fixture for layout detection.
+
+# Local assistant context, not part of the project
+CLAUDE.md

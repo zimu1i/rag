@@ -15,17 +15,17 @@ not the intended design.
 
 | Component | Status |
 | --- | --- |
-| PDF ingestion (PyMuPDF) | Working — separates the bilingual columns geometrically |
-| Text cleanup | Working — strips boilerplate and front matter, repairs hyphenation |
-| Chunking | Working — one chunk per provision, carrying its citation |
-| Embedding + vector cache | Working — batched, and invalidated when chunking changes |
+| PDF ingestion (PyMuPDF) | Working. Separates the bilingual columns geometrically |
+| Text cleanup | Working. Strips boilerplate and front matter, repairs hyphenation |
+| Chunking | Working. One chunk per provision, carrying its citation |
+| Embedding + vector cache | Working. Batched, and invalidated when chunking changes |
 | Semantic retrieval (cosine) | Working |
-| Generation (GPT-4o-mini) | Working — answers cite the provisions they rely on |
-| BM25 keyword retrieval | Working — hand-built, indexes citations and headings |
-| Hybrid merge / ranking | Working — reciprocal rank fusion + structured citation lookup |
-| Citation validation | Working — every answer's citations are audited against what was retrieved |
-| Low-support refusal threshold | **Tested and rejected** — no signal separates in from out of scope |
-| Evaluation set + retrieval metrics | Working — 26 labelled questions in five categories |
+| Generation (GPT-4o-mini) | Working. Answers cite the provisions they rely on |
+| BM25 keyword retrieval | Working. Hand-built, indexes citations and headings |
+| Hybrid merge / ranking | Working. Reciprocal rank fusion plus structured citation lookup |
+| Citation validation | Working. Every answer's citations are audited against what was retrieved |
+| Low-support refusal threshold | **Tested and rejected**. No signal separates in-scope from out-of-scope |
+| Evaluation set + retrieval metrics | Working. 26 labelled questions in five categories |
 
 The index holds 1,125 chunks, one per provision, each labelled with its section
 (e.g. `s. 122(1)`), marginal note, Part and source pages.
@@ -46,7 +46,7 @@ The index holds 1,125 chunks, one per provision, each labelled with its section
 - **A provision's substance can be split from its hook.** Chunking follows the
   Act's subsections, but a question is usually about a *section*. s. 241(1) says
   only that "a complainant may apply to a court for an order under this section";
-  the grounds a reader is looking for — "oppressive", "unfairly prejudicial" —
+  the grounds a reader is looking for ("oppressive", "unfairly prejudicial")
   are in s. 241(2). Retrieving one subsection therefore does not guarantee the
   neighbouring subsection that explains it. Whether retrieval should expand to
   sibling subsections is an open design question, deferred until hybrid
@@ -87,7 +87,7 @@ Calling the venv's interpreter directly is deliberate: if you have Anaconda or
 another Python on your `PATH`, a bare `python rag.py` will pick that one up and
 fail with `ModuleNotFoundError: No module named 'openai'`.
 
-On first run this embeds the Act and writes `embeddings.json` (gitignored) —
+On first run this embeds the Act and writes `embeddings.json` (gitignored):
 about 107,000 tokens, roughly one minute and well under a cent. Subsequent runs
 load the cache. The cache records a fingerprint of the chunks it was built from,
 so changing the chunking automatically triggers a rebuild rather than silently
@@ -128,7 +128,7 @@ Per category, for the full system:
 Two results worth reading carefully:
 
 - **Fusing semantic and BM25 made section-number queries worse than BM25 alone**
-  (0.33 → 0.17 hit@3). Semantic retrieval returns the same generic
+  (hit@3 fell from 0.33 to 0.17). Semantic retrieval returns the same generic
   cross-reference chunks for every numbered query, and fusion reinforces them.
   What fixed those queries was not a better scorer but a lookup: "section 122"
   is answered from the section metadata attached during chunking.
@@ -137,7 +137,7 @@ Two results worth reading carefully:
 
 ### Caveats on these numbers
 
-- 26 questions is a small set. One case moves a category by 0.14–0.25.
+- 26 questions is a small set. One case moves a category by 0.14 to 0.25.
 - Fusion parameters were chosen by sweeping against this same set, so the
   reported figures are optimistic. RRF is kept at its standard k=60 with equal
   weights rather than the best-scoring configuration, to limit that. A proper
@@ -154,18 +154,18 @@ were tested; all of them overlap:
 
 | signal | lowest answerable | highest out-of-scope | separation |
 | --- | --- | --- | --- |
-| max cosine | 0.487 | 0.633 | −0.147 |
-| top-1 minus top-5 mean | 0.009 | 0.120 | −0.111 |
-| peak vs corpus mean | 0.160 | 0.305 | −0.145 |
-| mean of top 3 | 0.465 | 0.588 | −0.123 |
-| top BM25 score | 6.71 | 13.89 | −7.18 |
+| max cosine | 0.487 | 0.633 | -0.147 |
+| top-1 minus top-5 mean | 0.009 | 0.120 | -0.111 |
+| peak vs corpus mean | 0.160 | 0.305 | -0.145 |
+| mean of top 3 | 0.465 | 0.588 | -0.123 |
+| top BM25 score | 6.71 | 13.89 | -7.18 |
 
 The cause is structural, not a matter of tuning. "What are the requirements to
 incorporate under the *Ontario* Business Corporations Act?" is semantically
-almost identical to a legitimate CBCA question — retrieval similarity measures
+almost identical to a legitimate CBCA question. Retrieval similarity measures
 topical closeness, not which statute governs. Worse, the best signal is
 *anti-correlated* with answer quality on the one category the system handles
-perfectly: section-number queries score 0.354–0.485, the lowest of any answerable
+perfectly: section-number queries score 0.354 to 0.485, the lowest of any answerable
 group, because a citation query is lexically unlike the provision it names.
 
 So no threshold ships. What is relied on instead:
@@ -187,8 +187,8 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-Tests mock the OpenAI client, so they are deterministic, offline, and free —
-no API key or network access required.
+Tests mock the OpenAI client, so they are deterministic, offline, and free.
+No API key or network access is required.
 
 ## Data
 

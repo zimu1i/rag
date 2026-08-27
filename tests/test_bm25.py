@@ -32,7 +32,7 @@ class TestTokenize:
         assert tokenize("subject to the by-laws") == ["subject", "to", "the", "by-laws"]
 
     def test_drops_bare_punctuation(self):
-        assert tokenize("(a) — ;") == ["a"]
+        assert tokenize("(a) ... ;") == ["a"]
 
     def test_empty_string(self):
         assert tokenize("") == []
